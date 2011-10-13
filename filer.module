@@ -1,0 +1,147 @@
+<?php
+/**
+ * @file
+ * This is the file description for Filer module.
+ *
+ * In this more verbose, multi-line description, you can specify what this
+ * file does exactly. Make sure to wrap your documentation in column 78 so
+ * that the file can be displayed nicely in default-sized consoles.
+ */
+
+/**
+ * Implements hook_permission().
+ */
+function filer_permission() {
+  return array(
+    'use filer' =>  array(
+      'title' => t('Access filer media manager.'),
+    ),
+  );
+}
+
+
+/**
+ * Implements hook_menu().
+ */
+function filer_menu() {
+  $items['admin/filer'] = array(
+    'title' => 'Filer Media Manager',
+    'page callback' => '_filer_loader',
+    'access arguments' => array('use filer'),
+    'type' => MENU_CALLBACK,
+  );
+
+	$items['admin/filer/%'] = array(
+	  'title' => 'Filer Media Manager',
+	  'page callback' => '_filer_loader',
+	  'access arguments' => array('use filer'),
+		'page arguments' => array(2),
+	  'type' => MENU_CALLBACK,
+	);
+
+  return $items;
+}
+
+
+function _filer_make_scale_and_crop_image_style($width, $height) {
+  return array(
+    'effects' => array(
+      array(
+        'name' => 'image_scale_and_crop',
+        'data' => array('width' => $width, 'height' => $height),
+        'weight' => 0,
+      ),
+    ),
+  );
+}
+
+
+/**
+ * Implements hook_image_default_styles().
+ */
+function filer_image_default_styles() {
+  $styles = array();
+	$styles['filer_icon_48'] = _filer_make_scale_and_crop_image_style(128, 128);
+  return $styles;
+}
+
+
+/**
+ * Implements hook_theme().
+ */
+function filer_theme($existing, $type, $theme, $path) {
+  return array(
+    'filer_ui' => array(
+      'template' => 'ui',
+			'variables' => array('folders' => array(), 'files' => array()),
+    ),
+		'image_style_outside_files' => array(
+			'variables' => array(
+				'style_name' => NULL,
+				'path' => NULL,
+				'alt' => '',
+				'title' => NULL,
+				'attributes' => array(),
+			),
+		),
+  );
+}
+
+
+/**
+ * This theme function is designed to deal with the limitation that
+ * theme_image_style does not work with images outside the files directory.
+ * 
+ * Usage is the same as theme_image_style.
+ * 
+ * @param $variables
+ */
+function theme_image_style_outside_files($variables) {
+  $styled_path = image_style_path($variables['style_name'], $variables['path']);
+  if (!file_exists($styled_path)) {
+    $style = image_style_load($variables['style_name']);
+    image_style_create_derivative($style, $variables['path'], $styled_path);
+  }
+  $variables['path'] = $styled_path;
+  return theme('image', $variables);
+}
+
+
+/**
+ * Menu callback that loads the media manager UI.
+ */
+function _filer_loader($folder_id = 1) {
+	
+	$image_mimes = array(
+		'image/gif',
+    'image/jpeg',
+    'image/png',
+	);
+	
+	// get folders
+	$result = db_query("SELECT folder_id, name FROM {folder} WHERE parent_folder_id = :folder_id", array(':folder_id' => $folder_id));
+	$folders = $result->fetchAll();
+	
+	// get images
+	$result = db_query("SELECT fid, filename, uri, filemime, folder_id FROM {file_managed} WHERE folder_id = :folder_id", array(':folder_id' => $folder_id));
+	$files = $result->fetchAll();
+
+	foreach($files as $delta => $file) {
+		
+		$files[$delta]->url = file_create_url($file->uri);
+		
+		if(in_array($file->filemime, $image_mimes)) {
+			$files[$delta]->content = theme('image_style', array('style_name' => 'filer_icon_48', 'path' => $file->uri));
+		}
+		else {
+			$icon = drupal_get_path('module', 'filer') . '/images/unknown48.jpg';
+			$files[$delta]->content = theme('image_style_outside_files', array('style_name' => 'filer_icon_48', 'path' => $icon));
+		}
+	}
+		
+	// add in CSS and JS
+	drupal_add_css(drupal_get_path('module', 'filer') . '/ui.css', array('group' => CSS_THEME, 'preprocess' => FALSE));
+	drupal_add_js(drupal_get_path('module', 'filer') . '/filer.js', array('group' => JS_THEME));
+	
+	return theme('filer_ui', array('folders' => $folders, 'files' => $files));
+}

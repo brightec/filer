@@ -1,0 +1,20 @@
+.filer_folder, .filer_file {
+	float: left;
+	margin: 0 20px 20px 0;
+	text-align: center;
+}
+
+.filer_folder_icon {
+	height: 48px;	
+	min-width: 48px;
+	background: transparent url(images/folder48.png) no-repeat top center;
+	cursor: pointer;
+}
+
+.filer_file {
+	cursor: pointer;
+}
+
+.filer_folder_label, .filer_file_label {
+	text-align: center;
+}

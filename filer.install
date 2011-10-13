@@ -1,0 +1,97 @@
+<?php
+
+/**
+ * Implements hook_schema().
+ */
+function filer_schema() {
+  $schema['folder'] = array(
+    'description' => 'The base table for folders.',
+    'fields' => array(
+      'folder_id' => array(
+        'description' => 'The primary identifier for a folder.',
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE),
+      'parent_folder_id' => array(
+        'description' => 'The parent ID that the folder belongs to.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0),
+      'name' => array(
+        'description' => 'The title for this folder in plain text.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => ''),
+      ),
+    'indexes' => array(
+      'parent_folder_id' => array('parent_folder_id'),
+     ),
+    'primary key' => array('folder_id'),
+  );
+  return $schema;
+}
+
+/**
+ * Implements hook_install().
+ */
+function filer_install() {
+	
+	$folder_id = array(
+    'description' => 'The folder ID that the image belongs to.',
+    'type' => 'int',
+    'unsigned' => TRUE,
+    'not null' => TRUE,
+    'default' => 1
+	);
+	
+	// alter file_managed table adding folder_id
+	db_add_field('file_managed', 'folder_id', $folder_id);
+	
+  // populate the default value for folder_id
+  db_update('file_managed')
+    ->fields(array(
+      'folder_id' => 1,
+    ))
+    ->execute();
+
+  // add default root folder
+  db_insert('folder')
+    ->fields(array(
+      'folder_id' => 1,
+			'parent_folder_id' => 0,
+			'name' => 'Files'
+    ))
+    ->execute();
+
+	// add default folders
+  db_insert('folder')
+    ->fields(array(
+			'parent_folder_id' => 1,
+			'name' => 'Images'
+    ))
+    ->execute();
+
+  db_insert('folder')
+    ->fields(array(
+			'parent_folder_id' => 1,
+			'name' => 'Documents'
+    ))
+    ->execute();
+
+  db_insert('folder')
+    ->fields(array(
+			'parent_folder_id' => 1,
+			'name' => 'Media'
+    ))
+    ->execute();
+}
+
+/**
+ * Implements hook_uninstall().
+ */
+function filer_uninstall() {
+	db_drop_field('file_managed', 'folder_id');
+}
+
