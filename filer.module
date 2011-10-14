@@ -24,14 +24,14 @@ function filer_permission() {
  * Implements hook_menu().
  */
 function filer_menu() {
-  $items['admin/filer'] = array(
+  $items['filer/browser'] = array(
     'title' => 'Filer Media Manager',
     'page callback' => '_filer_loader',
     'access arguments' => array('use filer'),
     'type' => MENU_CALLBACK,
   );
 
-	$items['admin/filer/%'] = array(
+	$items['filer/browser/%'] = array(
 	  'title' => 'Filer Media Manager',
 	  'page callback' => '_filer_loader',
 	  'access arguments' => array('use filer'),
@@ -75,6 +75,10 @@ function filer_theme($existing, $type, $theme, $path) {
       'template' => 'ui',
 			'variables' => array('folders' => array(), 'files' => array()),
     ),
+    'filer_uploader' => array(
+      'template' => 'upload',
+      'variables' => array('form' => ''),
+    ),
 		'image_style_outside_files' => array(
 			'variables' => array(
 				'style_name' => NULL,
@@ -108,6 +112,62 @@ function theme_image_style_outside_files($variables) {
 
 
 /**
+ * undocumented function
+ *
+ * @return void
+ * @author Cameron Cooke
+ */
+function _filer_upload_form($form_id, $args, $folder_id) {
+  $form = array();
+  
+  $form['folder_id'] = array(
+    '#type' => 'hidden',
+    '#value' => $folder_id,
+  );
+  
+  $form['upload_fid'] = array(
+    '#type' => 'file',
+    '#title' => t('Upload'),
+  );
+  
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => 'Upload',
+  );
+  
+  return $form;
+}
+
+
+/**
+ * undocumented function
+ *
+ * @param string $form 
+ * @param string $form_state 
+ * @param string $extra 
+ * @return void
+ * @author Cameron Cooke
+ */
+function _filer_upload_form_submit($form, &$form_state) {
+
+  if(isset($_FILES) && is_uploaded_file($_FILES['files']['tmp_name']['upload_fid'])) {
+    $file = file_save_upload('upload_fid', array(), file_default_scheme() . '://');
+    $file->status = FILE_STATUS_PERMANENT;
+    $file = file_save($file);
+    
+    db_update('file_managed')->fields(array(
+      'folder_id' => $form_state['values']['folder_id'],
+    ))
+    ->condition('fid', $file->fid, '=')
+    ->execute();
+    
+    drupal_set_message(t('The file :filename was successfully uploaded.', array(':filename' => $file->filename)));
+  }
+}
+
+
+
+/**
  * Menu callback that loads the media manager UI.
  */
 function _filer_loader($folder_id = 1) {
@@ -138,10 +198,23 @@ function _filer_loader($folder_id = 1) {
 			$files[$delta]->content = theme('image_style_outside_files', array('style_name' => 'filer_icon_48', 'path' => $icon));
 		}
 	}
+	
+	// upload form
+	$form = theme('filer_uploader', array('form' => render(drupal_get_form('_filer_upload_form', $folder_id))));
 		
 	// add in CSS and JS
-	drupal_add_css(drupal_get_path('module', 'filer') . '/ui.css', array('group' => CSS_THEME, 'preprocess' => FALSE));
-	drupal_add_js(drupal_get_path('module', 'filer') . '/filer.js', array('group' => JS_THEME));
+	drupal_add_css(drupal_get_path('module', 'filer') . '/css/ui.css', array('group' => CSS_THEME, 'preprocess' => FALSE));
+	drupal_add_js(drupal_get_path('module', 'filer') . '/js/filer.js', array('group' => JS_THEME));
 	
-	return theme('filer_ui', array('folders' => $folders, 'files' => $files));
+	return theme('filer_ui', array('folders' => $folders, 'files' => $files, 'form' => $form));
+}
+
+/**
+ * Implements hook_wysiwyg_include_directory().
+ */
+function filer_wysiwyg_include_directory($type) {
+  switch ($type) {
+    case 'plugins':
+      return 'wysiwyg-plugins';
+  }
 }

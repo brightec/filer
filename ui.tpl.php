@@ -1,3 +1,5 @@
+<?php print $form ?>
+
 <?php foreach($folders as $delta => $folder): ?>
   <div class="filer_folder" data-id="<?php print $folder->folder_id; ?>">
     <a href="<?php print $folder->folder_id; ?>">
