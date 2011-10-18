@@ -67,13 +67,73 @@ function filer_image_default_styles() {
 
 
 /**
+ * Implements hook_library().
+ */
+function filer_library() {
+  $path = drupal_get_path('module', 'filer');
+  
+  $common = array(
+    'website' => 'http://www.brightec.co.uk',
+    'version' => '7.x',
+  );
+
+  /**
+   * Common resources
+   */
+  $libraries['filer_base'] = array(
+    'title' => 'Filer base',
+    'js' => array(
+      $path . '/js/filer-core.js' => array('group' => JS_LIBRARY, 'weight' => - 5),
+    ),
+    'css' => array(
+      $path . '/css/filer.css',
+    ),
+  ); 
+  
+  /**
+   * Resources for launching the browser
+   */
+  $libraries['filer_launcher'] = array(
+    'title' => 'Filer launcher libraries',
+    'js' => array(
+      $path . '/js/filer-launcher.js' => array('group' => JS_DEFAULT),
+    ),
+    'dependencies' => array(
+      array('filer', 'filer_base'),
+      array('system', 'ui.dialog'),
+    ),
+  );
+  
+  /**
+   * Resources for the browser itself
+   */
+  $libraries['filer_browser'] = array(
+    'title' => 'Filer browser libraries',
+    'js' => array(
+      $path . '/js/filer-browser.js' => array('group' => JS_DEFAULT),
+    ),
+    'dependencies' => array(
+      array('filer', 'filer_base'),
+      array('system', 'ui.dialog'),
+    ),
+  );
+ 
+  foreach ($libraries as &$library) {
+    $library += $common;
+  }
+  
+  return $libraries; 
+}
+
+
+/**
  * Implements hook_theme().
  */
 function filer_theme($existing, $type, $theme, $path) {
   return array(
     'filer_ui' => array(
       'template' => 'ui',
-			'variables' => array('folders' => array(), 'files' => array()),
+			'variables' => array('folders' => array(), 'files' => array(), 'form' => ''),
     ),
     'filer_uploader' => array(
       'template' => 'upload',
@@ -198,15 +258,19 @@ function _filer_loader($folder_id = 1) {
 			$files[$delta]->content = theme('image_style_outside_files', array('style_name' => 'filer_icon_48', 'path' => $icon));
 		}
 	}
-	
-	// upload form
-	$form = theme('filer_uploader', array('form' => render(drupal_get_form('_filer_upload_form', $folder_id))));
 		
-	// add in CSS and JS
-	drupal_add_css(drupal_get_path('module', 'filer') . '/css/ui.css', array('group' => CSS_THEME, 'preprocess' => FALSE));
-	drupal_add_js(drupal_get_path('module', 'filer') . '/js/filer.js', array('group' => JS_THEME));
+	/**
+	 * Create render array
+	 */
+	$render =  array(
+	 '#theme' => 'filer_ui',
+	 '#folders' => $folders,
+	 '#files' => $files,
+	 '#form' => theme('filer_uploader', array('form' => render(drupal_get_form('_filer_upload_form', $folder_id)))),
+	);
+	$render['#attached']['library'][] = array('filer', 'filer_browser');
 	
-	return theme('filer_ui', array('folders' => $folders, 'files' => $files, 'form' => $form));
+	return $render;
 }
 
 /**

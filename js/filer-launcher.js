@@ -1,6 +1,6 @@
 (function ($) {
 
-  namespace('Drupal.filer.dialogs');
+  _filer_namespace('Drupal.filer.dialogs');
   
   Drupal.filer.dialogs.mediaBrowser = function() {
     $('<div><iframe id="filer-iframe" style="width: 100%; height: 100%;" frameborder="0" src="' + Drupal.settings.filer.browserURL + '"></iframe></div>').dialog({

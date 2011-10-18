@@ -2,7 +2,7 @@
 
 <?php foreach($folders as $delta => $folder): ?>
   <div class="filer_folder" data-id="<?php print $folder->folder_id; ?>">
-    <a href="<?php print $folder->folder_id; ?>">
+    <a href="<?php print base_path() . 'filer/browser/' .  $folder->folder_id; ?>">
       <div class="filer_folder_icon"></div>
     </a>
     <div class="filer_folder_label"><?php print $folder->name; ?></div>
