@@ -7,7 +7,7 @@ function filer_filer_plugin() {
   
   global $base_url;
   
-  $settings = array('browserURL' => $base_url . '/filer/browser');
+  $settings = array('browserURL' => $base_url . '/filer/browser/?render=filer-popup');
   drupal_add_js(array('filer' => $settings), 'setting');
   drupal_add_library('filer', 'filer_launcher');
   

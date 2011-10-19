@@ -29,6 +29,7 @@ function filer_menu() {
     'page callback' => '_filer_loader',
     'access arguments' => array('use filer'),
     'type' => MENU_CALLBACK,
+    'delivery callback' =>'_filer_deliver_html_page',
   );
 
 	$items['filer/browser/%'] = array(
@@ -37,6 +38,7 @@ function filer_menu() {
 	  'access arguments' => array('use filer'),
 		'page arguments' => array(2),
 	  'type' => MENU_CALLBACK,
+    'delivery callback' =>'_filer_deliver_html_page',
 	);
 
   return $items;
@@ -132,13 +134,17 @@ function filer_library() {
 function filer_theme($existing, $type, $theme, $path) {
   return array(
     'filer_ui' => array(
-      'template' => 'ui',
+      'template' => 'templates/ui',
 			'variables' => array('folders' => array(), 'files' => array(), 'form' => ''),
     ),
     'filer_uploader' => array(
-      'template' => 'upload',
+      'template' => 'templates/upload',
       'variables' => array('form' => ''),
     ),
+    'filer_dialog_page' => array(
+      'render element' => 'page',
+      'template' => 'templates/page',
+    ),    
 		'image_style_outside_files' => array(
 			'variables' => array(
 				'style_name' => NULL,
@@ -180,6 +186,11 @@ function theme_image_style_outside_files($variables) {
 function _filer_upload_form($form_id, $args, $folder_id) {
   $form = array();
   
+  $form['render'] = array(
+    '#type' => 'hidden',
+    '#value' => isset($_GET['render']) ? $_GET['render'] : '',
+  );  
+  
   $form['folder_id'] = array(
     '#type' => 'hidden',
     '#value' => $folder_id,
@@ -209,6 +220,8 @@ function _filer_upload_form($form_id, $args, $folder_id) {
  * @author Cameron Cooke
  */
 function _filer_upload_form_submit($form, &$form_state) {
+  
+  global $base_url;
 
   if(isset($_FILES) && is_uploaded_file($_FILES['files']['tmp_name']['upload_fid'])) {
     $file = file_save_upload('upload_fid', array(), file_default_scheme() . '://');
@@ -223,6 +236,9 @@ function _filer_upload_form_submit($form, &$form_state) {
     
     drupal_set_message(t('The file :filename was successfully uploaded.', array(':filename' => $file->filename)));
   }
+  
+  $path = t($base_url . '/filer/browser/?render=@render&folder_id=@folder_id', array('@render' => $form_state['values']['render'], '@folder_id' => $form_state['values']['folder_id']));
+  drupal_goto($path);
 }
 
 
@@ -281,4 +297,94 @@ function filer_wysiwyg_include_directory($type) {
     case 'plugins':
       return 'wysiwyg-plugins';
   }
+}
+
+/**
+ * Add messages to the page.
+ */
+function template_preprocess_filer_dialog_page(&$variables) {
+  $variables['messages'] = theme('status_messages');
+}
+
+/**
+ * Implements hook_page_alter().
+ */
+// function filer_page_alter(&$page) {
+//   if (isset($_GET['render']) && $_GET['render'] == 'filer-popup') {
+//     $page['#theme'] = 'filer_dialog_page';
+//     // temporary fix while awaiting fix for 914786
+//     if (module_exists('admin_menu')) {
+//       admin_menu_suppress();
+//     }
+//     foreach (element_children($page) as $key) {
+//       if ($key != 'content') {
+//         unset($page[$key]);
+//       }
+//     }        
+//   }
+// }
+
+/*
+ * Delivery callback for changing the page template used.
+ */
+function _filer_deliver_html_page($page_callback_result) {
+  // Emit the correct charset HTTP header, but not if the page callback
+  // result is NULL, since that likely indicates that it printed something
+  // in which case, no further headers may be sent, and not if code running
+  // for this page request has already set the content type header.
+  if (isset($page_callback_result) && is_null(drupal_get_http_header('Content-Type'))) {
+    drupal_add_http_header('Content-Type', 'text/html; charset=utf-8');
+  }
+  
+  print _filer_render_page($page_callback_result);
+  
+  // Perform end-of-request tasks.
+  drupal_page_footer();    
+}
+
+function _filer_render_page($page) {
+  $main_content_display = &drupal_static('system_main_content_added', FALSE);
+
+  // Allow menu callbacks to return strings or arbitrary arrays to render.
+  // If the array returned is not of #type page directly, we need to fill
+  // in the page with defaults.
+  if (is_string($page) || (is_array($page) && (!isset($page['#type']) || ($page['#type'] != 'page')))) {
+    drupal_set_page_content($page);
+    $page = element_info('page');
+  }
+
+  // Modules can add elements to $page as needed in hook_page_build().
+  foreach (module_implements('page_build') as $module) {
+    $function = $module . '_page_build';
+    $function($page);
+  }
+  // Modules alter the $page as needed. Blocks are populated into regions like
+  // 'sidebar_first', 'footer', etc.
+  drupal_alter('page', $page);
+
+  // If no module has taken care of the main content, add it to the page now.
+  // This allows the site to still be usable even if no modules that
+  // control page regions (for example, the Block module) are enabled.
+  if (!$main_content_display) {
+    $page['content']['system_main'] = drupal_set_page_content();
+  }
+  
+  // change page template if in popup
+  if (isset($_GET['render']) && $_GET['render'] == 'filer-popup') {
+
+    // change theme
+    $page['#theme'] = 'filer_dialog_page';
+  
+    /* remove admin menu */
+    if (module_exists('admin_menu')) {
+      admin_menu_suppress();
+    }
+    foreach (element_children($page) as $key) {
+      if ($key != 'content') {
+        unset($page[$key]);
+      }
+    } 
+  }
+  
+  return drupal_render($page);  
 }
